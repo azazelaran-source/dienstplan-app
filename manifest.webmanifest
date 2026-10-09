@@ -1,0 +1,16 @@
+{
+  "name": "Dienstplan",
+  "short_name": "Dienstplan",
+  "description": "Dienstplanung für Nacht-, Begleit-, Urlaub-, Frei-, Supervisions- und Teamdienste",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#1f5fbf",
+  "lang": "de-DE",
+  "orientation": "any",
+  "icons": [
+    {"src":"icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

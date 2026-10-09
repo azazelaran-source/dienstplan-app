@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f5fbf">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Dienstplan">
+  <title>Dienstplan</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div><h1>Dienstplan</h1><p class="sub">Nacht · Begleit · Urlaub · Freiwunsch · Supervision · Team</p></div>
+  <div class="monthbox"><label for="monthInput">Monat</label><input id="monthInput" type="month" min="2026-01" max="2028-12"><button id="loadMonth" class="primary">Monat laden</button><button id="installApp">App installieren</button></div>
+</header>
+<nav class="tabs"><button class="tab active" data-tab="plan">Planung</button><button class="tab" data-tab="overview">Wochenübersicht</button><button class="tab" data-tab="settings">Einstellungen</button></nav>
+<main>
+<section id="plan" class="panel active">
+  <div class="toolbar sticky-tools"><button class="shift n" data-shift="N">Nacht</button><button class="shift b" data-shift="B">Begleit</button><button class="shift u" data-shift="U">Urlaub</button><button class="shift f" data-shift="F">Freiwunsch</button><button class="shift s" data-shift="S">Supervision</button><button class="shift t" data-shift="T">Team</button><button id="clearSelected">Markierte löschen</button><button id="clearSelection">Auswahl aufheben</button></div>
+  <div class="toolbar secondary"><button id="autoSchedule" class="primary">Automatisch verteilen</button><button id="fillTeam">Teamtage auffüllen</button><button id="clearAuto">Automatische entfernen</button><button id="clearExcept">Nur Urlaub/Freiwunsch behalten</button><button id="clearAll" class="danger">Alle Schichten entfernen</button></div>
+  <div id="status" class="status"></div><h2 class="table-title">Dienstplantabelle</h2><div class="table-scroll"><table id="planTable" class="plan-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div><p class="hint">Zellen antippen, danach eine Schichtart wählen. Mehrfachauswahl ist möglich.</p>
+</section>
+<section id="overview" class="panel"><h2 class="table-title">Wochenübersicht</h2><div class="table-scroll"><table id="overviewTable" class="overview-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div></section>
+<section id="settings" class="panel">
+  <div class="settings-actions"><button id="saveSettings" class="primary">Einstellungen speichern</button><button id="exportBtn">Sicherung herunterladen</button><label class="buttonlike filelabel">Sicherung importieren<input id="importFile" type="file" accept="application/json"></label></div>
+  <h2>Schichtzeiten</h2><div class="table-scroll"><table id="timesTable" class="settings-table"></table></div>
+  <div class="settings-grid"><div><h2>Schulferien</h2><div id="vacations"></div><button id="addVacation">Ferienzeitraum hinzufügen</button></div><div><h2>Feiertage</h2><div id="holidays"></div><button id="addHoliday">Feiertag hinzufügen</button></div></div>
+</section>
+</main>
+<footer>Dienstplan-App v3 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
+<script src="engine.js"></script><script src="app.js"></script>
+</body>
+</html>
