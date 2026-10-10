@@ -27,9 +27,9 @@ const Engine = (() => {
     Mittwoch:   {night_school:14, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:4},
     Donnerstag: {night_school:14, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:0},
     Freitag:    {night_school:15.5, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:0},
-    Samstag:    {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:7.7, team:0},
-    Sonntag:    {night_school:14, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:7.7, team:0},
-    Feiertag:   {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:7.7, team:0}
+    Samstag:    {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:0, team:0},
+    Sonntag:    {night_school:14, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:0, team:0},
+    Feiertag:   {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:0, team:0}
   };
 
   function clone(x){ return JSON.parse(JSON.stringify(x)); }
