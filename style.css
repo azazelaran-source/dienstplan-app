@@ -21,3 +21,5 @@ main{padding:18px;max-width:1600px;margin:auto}.panel{display:none}.panel.active
 @media (display-mode: standalone){#installApp{display:none}}
 
 .table-title{font-size:1rem;margin:10px 0 8px;color:var(--text)}
+
+.supplement-row th,.supplement-row td{background:#eef4fb;font-weight:700}.supplement-row th{white-space:normal;line-height:1.15}.night-grid{display:grid;gap:18px}.night-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px}.night-card h3{margin:0 0 10px;font-size:1rem}.night-table th,.night-table td{min-width:118px}.night-table th:first-child,.night-table td:first-child{min-width:120px}.clock-input{width:82px;text-align:center;font-variant-numeric:tabular-nums}@media(max-width:720px){.night-card{padding:8px}.night-table th,.night-table td{min-width:105px}.clock-input{width:76px}.supplement-row th{font-size:.78rem}}

@@ -27,11 +27,14 @@
 <section id="overview" class="panel"><h2 class="table-title">Wochenübersicht</h2><div class="table-scroll"><table id="overviewTable" class="overview-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div></section>
 <section id="settings" class="panel">
   <div class="settings-actions"><button id="saveSettings" class="primary">Einstellungen speichern</button><button id="exportBtn">Sicherung herunterladen</button><label class="buttonlike filelabel">Sicherung importieren<input id="importFile" type="file" accept="application/json"></label></div>
-  <h2>Schichtzeiten</h2><div class="table-scroll"><table id="timesTable" class="settings-table"></table></div>
+  <h2>Nachtdienst-Zeiten</h2>
+  <p class="hint">Der Hauptblock wird nach dem Starttag gewählt. Der Frühblock wird nach dem tatsächlichen Folgetag gewählt. Ferien haben Vorrang vor Feiertagen; Brückentage verwenden die Ferien-Zeiten. Zeitformat: HH:MM, als Ende ist auch 24:00 möglich.</p>
+  <div id="nightTimes"></div>
+  <h2>Weitere Schichtstunden</h2><div class="table-scroll"><table id="timesTable" class="settings-table"></table></div>
   <div class="settings-grid"><div><h2>Schulferien</h2><div id="vacations"></div><button id="addVacation">Ferienzeitraum hinzufügen</button></div><div><h2>Feiertage</h2><div id="holidays"></div><button id="addHoliday">Feiertag hinzufügen</button></div></div>
 </section>
 </main>
-<footer>Dienstplan-App v3 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
+<footer>Dienstplan-App v5 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
 <script src="engine.js"></script><script src="app.js"></script>
 </body>
 </html>

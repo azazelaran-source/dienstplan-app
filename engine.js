@@ -3,6 +3,7 @@
 const Engine = (() => {
   const SHIFT_TYPES = new Set(['N','B','U','F','S','T']);
   const WEEKDAY_NAMES = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+  const NIGHT_CONTEXTS = ['school','vacation','holiday'];
 
   const DEFAULT_VACATIONS = [
     ['2026-01-01','2026-01-05'], ['2026-02-02','2026-02-03'], ['2026-03-23','2026-04-07'],
@@ -21,34 +22,106 @@ const Engine = (() => {
     '2028-01-01','2028-04-14','2028-04-17','2028-05-01','2028-05-25','2028-06-05','2028-10-03','2028-10-31','2028-12-25','2028-12-26'
   ];
 
+  // Die bisherigen Stundenwerte bleiben für Begleit, Urlaub und Team bestehen.
+  // night_school/night_vacation bleiben nur zur Abwärtskompatibilität in alten Sicherungen erhalten.
   const DEFAULT_SHIFT_TIMES = {
     Montag:     {night_school:14, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:0},
     Dienstag:   {night_school:14, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:0},
     Mittwoch:   {night_school:14, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:4},
     Donnerstag: {night_school:14, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:0},
     Freitag:    {night_school:15.5, night_vacation:15.5, accomp_school:5.5, accomp_vacation:5.5, vacation:7.7, team:0},
-    Samstag:    {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:0, team:0},
-    Sonntag:    {night_school:14, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:0, team:0},
-    Feiertag:   {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:0, team:0}
+    Samstag:    {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:7.7, team:0},
+    Sonntag:    {night_school:14, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:7.7, team:0},
+    Feiertag:   {night_school:15.5, night_vacation:15.5, accomp_school:0, accomp_vacation:0, vacation:7.7, team:0}
+  };
+
+  // Standardwerte erhalten die bisherigen 14/15,5-Stunden-Nächte:
+  // Hauptblock 14:00-23:00 (= 9h), Frühblock werktags 5h, Wochenende/Ferien/Feiertag 6,5h.
+  function makeNightContext(followWeekendLong){
+    const out={};
+    WEEKDAY_NAMES.forEach((day,i)=>{
+      const long = followWeekendLong || i>=5;
+      out[day]={main_start:'14:00',main_end:'23:00',follow_start:'05:30',follow_end:long?'12:00':'10:30'};
+    });
+    return out;
+  }
+  const DEFAULT_NIGHT_TIMES = {
+    school: makeNightContext(false),
+    vacation: makeNightContext(true),
+    holiday: makeNightContext(true)
   };
 
   function clone(x){ return JSON.parse(JSON.stringify(x)); }
   function pad(n){ return String(n).padStart(2,'0'); }
+  function round2(n){ return Math.round((Number(n)||0)*100)/100; }
   function parseDate(s){ const [y,m,d]=String(s).split('-').map(Number); return new Date(y,m-1,d,12,0,0,0); }
   function dateKey(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-  function addDays(d,n){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()+n,12,0,0,0); return x; }
+  function addDays(d,n){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n,12,0,0,0); }
   function cmpDate(a,b){ return dateKey(a).localeCompare(dateKey(b)); }
   function weekdayIndex(d){ return (d.getDay()+6)%7; } // Montag=0
   function monthDates(monthKey){ const [y,m]=monthKey.split('-').map(Number); const count=new Date(y,m,0).getDate(); return Array.from({length:count},(_,i)=>new Date(y,m-1,i+1,12)); }
 
+  function normalizeClock(value,allow24=false){
+    const m=String(value??'').trim().match(/^(\d{1,2}):(\d{2})$/);
+    if(!m) return null;
+    const h=Number(m[1]),min=Number(m[2]);
+    if(min<0||min>59) return null;
+    if(h===24 && min===0 && allow24) return '24:00';
+    if(h<0||h>23) return null;
+    return `${pad(h)}:${pad(min)}`;
+  }
+  function clockMinutes(value,allow24=false){
+    const v=normalizeClock(value,allow24); if(v===null) return null;
+    if(v==='24:00') return 1440;
+    const [h,m]=v.split(':').map(Number); return h*60+m;
+  }
+  function validNightRow(row){
+    if(!row||typeof row!=='object') return false;
+    const ms=clockMinutes(row.main_start,false), me=clockMinutes(row.main_end,true);
+    const fs=clockMinutes(row.follow_start,false), fe=clockMinutes(row.follow_end,true);
+    return ms!==null&&me!==null&&fs!==null&&fe!==null&&me>ms&&fe>fs;
+  }
+  function mergeNightTimes(raw){
+    const out=clone(DEFAULT_NIGHT_TIMES);
+    if(!raw||typeof raw!=='object') return out;
+    for(const context of NIGHT_CONTEXTS){
+      for(const day of WEEKDAY_NAMES){
+        const src=raw?.[context]?.[day]; if(!src||typeof src!=='object') continue;
+        const row={
+          main_start:normalizeClock(src.main_start,false),
+          main_end:normalizeClock(src.main_end,true),
+          follow_start:normalizeClock(src.follow_start,false),
+          follow_end:normalizeClock(src.follow_end,true)
+        };
+        if(validNightRow(row)) out[context][day]=row;
+      }
+    }
+    return out;
+  }
+  function mergeShiftTimes(raw){
+    const out=clone(DEFAULT_SHIFT_TIMES); if(!raw||typeof raw!=='object') return out;
+    for(const day of [...WEEKDAY_NAMES,'Feiertag']){
+      const src=raw[day]; if(!src||typeof src!=='object') continue;
+      for(const key of ['night_school','night_vacation','accomp_school','accomp_vacation','vacation','team']){
+        if(src[key]!==undefined && Number.isFinite(Number(src[key]))) out[day][key]=Number(src[key]);
+      }
+    }
+    return out;
+  }
+
   function defaultState(){
     const names=['','','','','','','','','',''];
     return {
-      version:2,
+      version:3,
       current_month:'2026-02',
       employees:names.map(name=>({name,target:0})),
       shifts:{},
-      settings:{vacations:clone(DEFAULT_VACATIONS),holidays:[...DEFAULT_HOLIDAYS],shift_times:clone(DEFAULT_SHIFT_TIMES)}
+      settings:{
+        vacations:clone(DEFAULT_VACATIONS),
+        holidays:[...DEFAULT_HOLIDAYS],
+        shift_times:clone(DEFAULT_SHIFT_TIMES),
+        night_times:clone(DEFAULT_NIGHT_TIMES)
+      }
     };
   }
 
@@ -77,8 +150,10 @@ const Engine = (() => {
     if(raw.settings && typeof raw.settings==='object'){
       if(Array.isArray(raw.settings.vacations)) out.settings.vacations=raw.settings.vacations.filter(v=>Array.isArray(v)&&v.length===2).map(v=>[String(v[0]),String(v[1])]);
       if(Array.isArray(raw.settings.holidays)) out.settings.holidays=raw.settings.holidays.map(String);
-      if(raw.settings.shift_times && typeof raw.settings.shift_times==='object') out.settings.shift_times=clone(raw.settings.shift_times);
+      out.settings.shift_times=mergeShiftTimes(raw.settings.shift_times);
+      out.settings.night_times=mergeNightTimes(raw.settings.night_times);
     }
+    out.version=3;
     return out;
   }
 
@@ -100,23 +175,78 @@ const Engine = (() => {
     if(wi===4){ const a=addDays(d,-1); return isHoliday(state,a)&&!isSchoolVacation(state,a); }
     return false;
   }
-  function followingDayUsesLongNight(state,d){ const n=addDays(d,1); return weekdayIndex(n)>=5 || isSchoolVacation(state,n) || (isHoliday(state,n)&&!isSchoolVacation(state,n)) || isBridgeDay(state,n); }
   function timeRowName(state,d){ if(isHoliday(state,d)&&!isSchoolVacation(state,d)) return 'Feiertag'; return WEEKDAY_NAMES[weekdayIndex(d)]; }
+  function nightDayType(state,d){
+    // Ferien haben wie bisher Vorrang vor Feiertagen. Brückentage verwenden die Ferien-/Langnacht-Zeiten.
+    if(isSchoolVacation(state,d)||isBridgeDay(state,d)) return 'vacation';
+    if(isHoliday(state,d)) return 'holiday';
+    return 'school';
+  }
+  function nightRowForDate(state,d){
+    const all=state.settings?.night_times||DEFAULT_NIGHT_TIMES;
+    const context=nightDayType(state,d), day=WEEKDAY_NAMES[weekdayIndex(d)];
+    return all?.[context]?.[day] || DEFAULT_NIGHT_TIMES[context][day];
+  }
+  function intervalMinutes(a,b){ return Math.max(0,(Number(b)||0)-(Number(a)||0)); }
+  function overlapMinutes(a,b,c,d){ return Math.max(0,Math.min(b,d)-Math.max(a,c)); }
+  function nightMinutesForInterval(start,end){ return overlapMinutes(start,end,0,360)+overlapMinutes(start,end,1320,1440); }
+
+  function nightShiftBreakdown(state,d){
+    const next=addDays(d,1), main=nightRowForDate(state,d), follow=nightRowForDate(state,next);
+    const ms=clockMinutes(main.main_start,false), me=clockMinutes(main.main_end,true);
+    const fs=clockMinutes(follow.follow_start,false), fe=clockMinutes(follow.follow_end,true);
+    if([ms,me,fs,fe].some(x=>x===null) || me<=ms || fe<=fs) return {workHours:0,nightWorkHours:0,readinessHours:0,sundayHolidayHours:0,workIntervals:[],readinessIntervals:[]};
+    const workIntervals=[{date:d,start:ms,end:me},{date:next,start:fs,end:fe}];
+    const readinessIntervals=[];
+    if(me<1440) readinessIntervals.push({date:d,start:me,end:1440});
+    if(fs>0) readinessIntervals.push({date:next,start:0,end:fs});
+    let work=0,night=0,sunHol=0,ready=0;
+    for(const x of workIntervals){
+      const mins=intervalMinutes(x.start,x.end); work+=mins; night+=nightMinutesForInterval(x.start,x.end);
+      if(weekdayIndex(x.date)===6 || isHoliday(state,x.date)) sunHol+=mins;
+    }
+    for(const x of readinessIntervals) ready+=intervalMinutes(x.start,x.end);
+    return {workHours:round2(work/60),nightWorkHours:round2(night/60),readinessHours:round2(ready/60),sundayHolidayHours:round2(sunHol/60),workIntervals,readinessIntervals};
+  }
 
   function hoursFor(state,d,type){
     const times=state.settings?.shift_times||DEFAULT_SHIFT_TIMES;
     const weekday=WEEKDAY_NAMES[weekdayIndex(d)];
     const weekdayRow=times[weekday]||DEFAULT_SHIFT_TIMES[weekday];
     const inVac=isSchoolVacation(state,d);
-    if(type==='N'){ const key=followingDayUsesLongNight(state,d)?'night_vacation':'night_school'; return Number(weekdayRow[key]||0); }
+    if(type==='N') return nightShiftBreakdown(state,d).workHours;
     if(type==='B'){ const row=times[timeRowName(state,d)]||{}; const key=inVac?'accomp_vacation':'accomp_school'; return Number(row[key]||0); }
     if(type==='U') return Number(weekdayRow.vacation||0);
     if(type==='T'){ const row=times[timeRowName(state,d)]||{}; return Number(row.team||0); }
     return 0;
   }
 
-  function monthActualHours(state,emp,monthKey){ let t=0; for(const d of monthDates(monthKey)){ const s=getShift(state,d,emp); if(s)t+=hoursFor(state,d,s.type); } return Math.round(t*100)/100; }
-  function monthDistributionHours(state,emp,monthKey){ let t=0; for(const d of monthDates(monthKey)){ const s=getShift(state,d,emp); if(s&&s.type!=='U') t+=hoursFor(state,d,s.type); } return t; }
+  function monthActualHours(state,emp,monthKey){ let t=0; for(const d of monthDates(monthKey)){ const s=getShift(state,d,emp); if(s)t+=hoursFor(state,d,s.type); } return round2(t); }
+  function monthDistributionHours(state,emp,monthKey){ let t=0; for(const d of monthDates(monthKey)){ const s=getShift(state,d,emp); if(s&&s.type!=='U') t+=hoursFor(state,d,s.type); } return round2(t); }
+  function monthSpecialHours(state,emp,monthKey){
+    let nightWork=0,nightReadiness=0,sundayHoliday=0;
+    const dates=monthDates(monthKey), first=dates[0], last=dates[dates.length-1];
+    // Ein Nachtdienst des Vormonats kann am 1. des Monats noch Frühblock/Bereitschaft erzeugen.
+    for(let d=addDays(first,-1);cmpDate(d,last)<=0;d=addDays(d,1)){
+      const s=getShift(state,d,emp); if(s?.type!=='N') continue;
+      const b=nightShiftBreakdown(state,d);
+      for(const x of b.workIntervals){
+        if(!dateKey(x.date).startsWith(monthKey+'-')) continue;
+        nightWork+=nightMinutesForInterval(x.start,x.end)/60;
+        if(weekdayIndex(x.date)===6 || isHoliday(state,x.date)) sundayHoliday+=intervalMinutes(x.start,x.end)/60;
+      }
+      for(const x of b.readinessIntervals){
+        if(dateKey(x.date).startsWith(monthKey+'-')) nightReadiness+=intervalMinutes(x.start,x.end)/60;
+      }
+    }
+    // Begleit/Team liegen vollständig auf ihrem Kalendertag. Urlaub ist keine gearbeitete Zeit.
+    for(const d of dates){
+      const s=getShift(state,d,emp); if(!s||s.type==='N') continue;
+      if((weekdayIndex(d)===6||isHoliday(state,d)) && ['B','T'].includes(s.type)) sundayHoliday+=hoursFor(state,d,s.type);
+    }
+    return {nightWork:round2(nightWork),nightReadiness:round2(nightReadiness),sundayHoliday:round2(sundayHoliday)};
+  }
+
   function canPlaceNight(state,d,emp){ if(getShift(state,d,emp)) return false; const below=getShift(state,addDays(d,1),emp); return !below || ['T','S'].includes(below.type); }
   function canPlaceAccompaniment(state,d,emp){ if(getShift(state,d,emp)) return false; const prev=getShift(state,addDays(d,-1),emp); return !(prev&&prev.type==='N'); }
 
@@ -203,10 +333,20 @@ const Engine = (() => {
 
   function clientPayload(state,monthKey){
     state.current_month=monthKey; const employees=clone(state.employees);
-    employees.forEach((e,i)=>{e.actual=String(e.name||'').trim()?monthActualHours(state,i,monthKey):0; e.difference=Math.round((e.actual-Number(e.target||0))*100)/100;});
+    employees.forEach((e,i)=>{
+      e.actual=String(e.name||'').trim()?monthActualHours(state,i,monthKey):0;
+      e.difference=round2(e.actual-Number(e.target||0));
+      const extra=String(e.name||'').trim()?monthSpecialHours(state,i,monthKey):{nightWork:0,nightReadiness:0,sundayHoliday:0};
+      e.nightWork=extra.nightWork; e.nightReadiness=extra.nightReadiness; e.sundayHoliday=extra.sundayHoliday;
+    });
     const days=monthDates(monthKey).map(d=>({date:dateKey(d),day:d.getDate(),weekday:WEEKDAY_NAMES[weekdayIndex(d)],vacation:isSchoolVacation(state,d),holiday:isHoliday(state,d),bridge:isBridgeDay(state,d),cells:Array.from({length:10},(_,e)=>getShift(state,d,e)?clone(getShift(state,d,e)):null)}));
     return {current_month:monthKey,employees,days,overview:overview(state,monthKey),settings:clone(state.settings)};
   }
 
-  return {defaultState,sanitizeState,parseDate,dateKey,monthDates,activeEmployeeIndexes,getShift,setShift,clearShift,isSchoolVacation,isHoliday,isBridgeDay,hoursFor,monthActualHours,monthDistributionHours,canPlaceNight,canPlaceAccompaniment,wouldExceedTwoNightsInSixDays,freePairViolations,autoSchedule,fillTeam,clearAutomatic,clearExceptLeaveFree,clearAll,clientPayload};
+  return {
+    defaultState,sanitizeState,parseDate,dateKey,monthDates,activeEmployeeIndexes,getShift,setShift,clearShift,
+    isSchoolVacation,isHoliday,isBridgeDay,hoursFor,monthActualHours,monthDistributionHours,monthSpecialHours,
+    nightShiftBreakdown,normalizeClock,canPlaceNight,canPlaceAccompaniment,wouldExceedTwoNightsInSixDays,
+    freePairViolations,autoSchedule,fillTeam,clearAutomatic,clearExceptLeaveFree,clearAll,clientPayload
+  };
 })();

@@ -1,12 +1,15 @@
 'use strict';
-const STORAGE_KEY='dienstplan_pwa_v4';
+const STORAGE_KEY='dienstplan_pwa_v4'; // absichtlich unverändert: vorhandene lokale Daten bleiben erhalten
 let persisted = loadState();
 let state = null;
 let selected = new Set();
 let deferredInstallPrompt = null;
 const SHIFT_LABELS = {N:'Nacht',B:'Begleit',U:'Urlaub',F:'Frei',S:'Supervision',T:'Team'};
 const DAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag','Feiertag'];
-const TIME_COLS = [['night_school','Nacht Schule'],['night_vacation','Nacht lang/Ferien'],['accomp_school','Begleit Schule'],['accomp_vacation','Begleit Ferien'],['vacation','Urlaub'],['team','Team']];
+const WEEKDAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+const TIME_COLS = [['accomp_school','Begleit Schule'],['accomp_vacation','Begleit Ferien'],['vacation','Urlaub'],['team','Team']];
+const NIGHT_CONTEXTS = [['school','Schulzeit'],['vacation','Ferien / Brückentag'],['holiday','Feiertag']];
+const NIGHT_FIELDS = [['main_start','Hauptblock von'],['main_end','Hauptblock bis'],['follow_start','Frühblock von'],['follow_end','Frühblock bis']];
 
 function el(id){return document.getElementById(id)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
@@ -20,9 +23,18 @@ function renderAll(){renderPlan();renderOverview();renderSettings();el('monthInp
 function renderPlan(){
   const t=el('planTable');let h='<thead><tr><th>Datum</th>';
   state.employees.forEach((e,i)=>h+=`<th><input class="emp-name" data-emp="${i}" value="${esc(e.name)}" placeholder="Mitarbeiter ${i+1}"></th>`);h+='</tr></thead><tbody>';
-  for(const d of state.days){const specials=[];if(d.vacation)specials.push('Ferien');if(d.holiday)specials.push('Feiertag');if(d.bridge)specials.push('Brücke');h+=`<tr><th class="date-cell ${d.vacation||d.holiday?'special':''}">${d.weekday.slice(0,2)}, ${String(d.day).padStart(2,'0')}.<span class="meta">${specials.join(' · ')}</span></th>`;d.cells.forEach((c,i)=>{const key=d.date+'|'+i,cls=c?c.type.toLowerCase():'',txt=c?SHIFT_LABELS[c.type]:'';h+=`<td class="shift-cell ${cls} ${selected.has(key)?'selected':''}" data-date="${d.date}" data-emp="${i}">${txt}${c&&c.automatic?'<span class="auto-badge">auto</span>':''}</td>`});h+='</tr>'}
+  for(const d of state.days){
+    const specials=[];if(d.vacation)specials.push('Ferien');if(d.holiday)specials.push('Feiertag');if(d.bridge)specials.push('Brücke');
+    h+=`<tr><th class="date-cell ${d.vacation||d.holiday?'special':''}">${d.weekday.slice(0,2)}, ${String(d.day).padStart(2,'0')}.<span class="meta">${specials.join(' · ')}</span></th>`;
+    d.cells.forEach((c,i)=>{const key=d.date+'|'+i,cls=c?c.type.toLowerCase():'',txt=c?SHIFT_LABELS[c.type]:'';h+=`<td class="shift-cell ${cls} ${selected.has(key)?'selected':''}" data-date="${d.date}" data-emp="${i}">${txt}${c&&c.automatic?'<span class="auto-badge">auto</span>':''}</td>`});h+='</tr>';
+  }
   h+='<tr class="hours-row"><th>Stunden Soll</th>';state.employees.forEach((e,i)=>h+=`<td><input type="number" step="0.1" class="target" data-emp="${i}" value="${Number(e.target||0)}"></td>`);h+='</tr>';
-  h+='<tr class="hours-row"><th>Stunden Ist</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.actual)}</td>`);h+='</tr><tr class="hours-row"><th>Differenz</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.difference)}</td>`);h+='</tr></tbody>';t.innerHTML=h;
+  h+='<tr class="hours-row"><th>Stunden Ist</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.actual)}</td>`);h+='</tr>';
+  h+='<tr class="hours-row"><th>Differenz</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.difference)}</td>`);h+='</tr>';
+  h+='<tr class="hours-row supplement-row"><th>Nachtarbeit</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.nightWork)}</td>`);h+='</tr>';
+  h+='<tr class="hours-row supplement-row"><th>Nachtbereitschaft</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.nightReadiness)}</td>`);h+='</tr>';
+  h+='<tr class="hours-row supplement-row"><th>Sonn-/Feiertagsarbeit</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.sundayHoliday)}</td>`);h+='</tr></tbody>';
+  t.innerHTML=h;
   t.querySelectorAll('.shift-cell').forEach(td=>td.addEventListener('click',()=>{const k=td.dataset.date+'|'+td.dataset.emp;if(selected.has(k))selected.delete(k);else selected.add(k);td.classList.toggle('selected')}));
   t.querySelectorAll('.emp-name,.target').forEach(inp=>inp.addEventListener('change',saveEmployees));
 }
@@ -31,8 +43,49 @@ function selectedCells(){return [...selected].map(k=>{const [date,employee]=k.sp
 function mark(type){if(!selected.size)return showStatus('Bitte zuerst mindestens eine Dienstplanzelle auswählen.',true);const cells=selectedCells();let n=0;for(const c of cells){if(!String(persisted.employees[c.employee]?.name||'').trim())continue;Engine.setShift(persisted,Engine.parseDate(c.date),c.employee,type,false);n++}saveState();const month=state.current_month;refresh(month);showStatus(`${n} Zelle(n) markiert.`)}
 function clearSelected(){if(!selected.size)return showStatus('Bitte zuerst Zellen auswählen.',true);let n=0;for(const c of selectedCells()){if(Engine.getShift(persisted,Engine.parseDate(c.date),c.employee)){Engine.clearShift(persisted,Engine.parseDate(c.date),c.employee);n++}}saveState();refresh(state.current_month);showStatus(`${n} markierte Schicht(en) gelöscht.`)}
 function renderOverview(){let h='<thead><tr><th></th><th>Montag</th><th>Dienstag</th><th>Mittwoch</th><th>Donnerstag</th><th>Freitag</th><th>Samstag</th><th>Sonntag</th></tr></thead><tbody>';state.overview.forEach(week=>{h+='<tr><th class="label">Datum</th>'+week.map(d=>d.date?`<td class="date ${d.special?'special':''}">${String(d.day).padStart(2,'0')}</td>`:'<td></td>').join('')+'</tr>';h+='<tr><th class="label">Nacht</th>'+week.map(d=>`<td>${esc(d.night||'')}</td>`).join('')+'</tr>';h+='<tr><th class="label">Begleit</th>'+week.map(d=>`<td>${esc(d.accomp||'')}</td>`).join('')+'</tr>'});h+='</tbody>';el('overviewTable').innerHTML=h}
-function renderSettings(){const times=state.settings.shift_times||{};let h='<thead><tr><th>Tag</th>'+TIME_COLS.map(x=>`<th>${x[1]}</th>`).join('')+'</tr></thead><tbody>';DAYS.forEach(day=>{h+=`<tr><th>${day}</th>`+TIME_COLS.map(([key])=>`<td><input type="number" step="0.1" data-day="${day}" data-key="${key}" value="${Number(times[day]?.[key]||0)}"></td>`).join('')+'</tr>'});h+='</tbody>';el('timesTable').innerHTML=h;el('vacations').innerHTML=(state.settings.vacations||[]).map((v,i)=>`<div class="setting-row"><input type="date" data-vac="${i}" data-pos="0" value="${esc(v[0])}"><span>bis</span><input type="date" data-vac="${i}" data-pos="1" value="${esc(v[1])}"><button data-del-vac="${i}">×</button></div>`).join('');el('holidays').innerHTML=(state.settings.holidays||[]).map((v,i)=>`<div class="setting-row"><input type="date" data-hol="${i}" value="${esc(v)}"><button data-del-hol="${i}">×</button></div>`).join('');document.querySelectorAll('[data-del-vac]').forEach(b=>b.onclick=()=>{state.settings.vacations.splice(Number(b.dataset.delVac),1);renderSettings()});document.querySelectorAll('[data-del-hol]').forEach(b=>b.onclick=()=>{state.settings.holidays.splice(Number(b.dataset.delHol),1);renderSettings()})}
-function saveSettings(){const times={};DAYS.forEach(day=>{times[day]={};TIME_COLS.forEach(([key])=>times[day][key]=Number(document.querySelector(`input[data-day="${day}"][data-key="${key}"]`)?.value||0))});const vacations=[];document.querySelectorAll('[data-vac][data-pos="0"]').forEach(inp=>{const i=Number(inp.dataset.vac),end=document.querySelector(`[data-vac="${i}"][data-pos="1"]`)?.value;if(inp.value&&end)vacations.push([inp.value,end])});const holidays=[...document.querySelectorAll('[data-hol]')].map(x=>x.value).filter(Boolean).sort();persisted.settings={shift_times:times,vacations,holidays};saveState();refresh(state.current_month);showStatus('Einstellungen gespeichert.')}
+
+function renderNightSettings(){
+  const times=state.settings.night_times||{};
+  let html='<div class="night-grid">';
+  for(const [context,label] of NIGHT_CONTEXTS){
+    html+=`<div class="night-card"><h3>${label}</h3><div class="table-scroll"><table class="settings-table night-table"><thead><tr><th>Tag</th>${NIGHT_FIELDS.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody>`;
+    for(const day of WEEKDAYS){
+      html+=`<tr><th>${day}</th>${NIGHT_FIELDS.map(([key])=>`<td><input class="clock-input" type="text" inputmode="numeric" placeholder="HH:MM" data-night-context="${context}" data-night-day="${day}" data-night-key="${key}" value="${esc(times?.[context]?.[day]?.[key]||'')}"></td>`).join('')}</tr>`;
+    }
+    html+='</tbody></table></div></div>';
+  }
+  html+='</div>';el('nightTimes').innerHTML=html;
+}
+function renderSettings(){
+  renderNightSettings();
+  const times=state.settings.shift_times||{};let h='<thead><tr><th>Tag</th>'+TIME_COLS.map(x=>`<th>${x[1]}</th>`).join('')+'</tr></thead><tbody>';
+  DAYS.forEach(day=>{h+=`<tr><th>${day}</th>`+TIME_COLS.map(([key])=>`<td><input type="number" step="0.1" data-day="${day}" data-key="${key}" value="${Number(times[day]?.[key]||0)}"></td>`).join('')+'</tr>'});h+='</tbody>';el('timesTable').innerHTML=h;
+  el('vacations').innerHTML=(state.settings.vacations||[]).map((v,i)=>`<div class="setting-row"><input type="date" data-vac="${i}" data-pos="0" value="${esc(v[0])}"><span>bis</span><input type="date" data-vac="${i}" data-pos="1" value="${esc(v[1])}"><button data-del-vac="${i}">×</button></div>`).join('');
+  el('holidays').innerHTML=(state.settings.holidays||[]).map((v,i)=>`<div class="setting-row"><input type="date" data-hol="${i}" value="${esc(v)}"><button data-del-hol="${i}">×</button></div>`).join('');
+  document.querySelectorAll('[data-del-vac]').forEach(b=>b.onclick=()=>{state.settings.vacations.splice(Number(b.dataset.delVac),1);renderSettings()});document.querySelectorAll('[data-del-hol]').forEach(b=>b.onclick=()=>{state.settings.holidays.splice(Number(b.dataset.delHol),1);renderSettings()});
+}
+function saveSettings(){
+  const times={};DAYS.forEach(day=>{times[day]={};TIME_COLS.forEach(([key])=>times[day][key]=Number(document.querySelector(`input[data-day="${day}"][data-key="${key}"]`)?.value||0))});
+  const nightTimes={};
+  for(const [context,label] of NIGHT_CONTEXTS){
+    nightTimes[context]={};
+    for(const day of WEEKDAYS){
+      nightTimes[context][day]={};
+      for(const [key,fieldLabel] of NIGHT_FIELDS){
+        const inp=document.querySelector(`input[data-night-context="${context}"][data-night-day="${day}"][data-night-key="${key}"]`);
+        const normalized=Engine.normalizeClock(inp?.value||'',key.endsWith('_end'));
+        if(normalized===null){showStatus(`Ungültige Zeit bei ${label}, ${day}, ${fieldLabel}. Bitte HH:MM verwenden; als Schichtende ist auch 24:00 erlaubt.`,true);inp?.focus();return;}
+        nightTimes[context][day][key]=normalized;
+      }
+      const r=nightTimes[context][day];
+      const toMin=(v)=>v==='24:00'?1440:Number(v.slice(0,2))*60+Number(v.slice(3,5));
+      if(toMin(r.main_end)<=toMin(r.main_start)||toMin(r.follow_end)<=toMin(r.follow_start)){showStatus(`Bei ${label}, ${day} muss „bis“ jeweils nach „von“ liegen. Für Mitternacht bitte 24:00 verwenden.`,true);return;}
+    }
+  }
+  const vacations=[];document.querySelectorAll('[data-vac][data-pos="0"]').forEach(inp=>{const i=Number(inp.dataset.vac),end=document.querySelector(`[data-vac="${i}"][data-pos="1"]`)?.value;if(inp.value&&end)vacations.push([inp.value,end])});
+  const holidays=[...document.querySelectorAll('[data-hol]')].map(x=>x.value).filter(Boolean).sort();
+  persisted.settings={...persisted.settings,shift_times:times,night_times:nightTimes,vacations,holidays};saveState();refresh(state.current_month);showStatus('Einstellungen gespeichert. Nachtstunden und Zuschlagszeiten wurden neu berechnet.');
+}
 function downloadBackup(){const blob=new Blob([JSON.stringify(persisted,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`dienstplan-sicherung-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function installHelp(){const isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);if(isiOS){alert('iPhone/iPad: In Safari auf Teilen tippen und „Zum Home-Bildschirm“ wählen. Danach startet der Dienstplan wie eine App.')}else{alert('Falls kein Installationsdialog erscheint: Browser-Menü öffnen und „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.')}}
 async function tryInstall(){if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;el('installApp').textContent='App installieren';}else installHelp()}
