@@ -22,7 +22,7 @@
 <section id="plan" class="panel active">
   <div class="toolbar sticky-tools"><button class="shift n" data-shift="N">Nacht</button><button class="shift b" data-shift="B">Begleit</button><button class="shift u" data-shift="U">Urlaub</button><button class="shift f" data-shift="F">Freiwunsch</button><button class="shift s" data-shift="S">Supervision</button><button class="shift t" data-shift="T">Team</button><button id="clearSelected">Markierte löschen</button><button id="clearSelection">Auswahl aufheben</button></div>
   <div class="toolbar secondary"><button id="autoSchedule" class="primary">Automatisch verteilen</button><button id="fillTeam">Teamtage auffüllen</button><button id="clearAuto">Automatische entfernen</button><button id="clearExcept">Nur Urlaub/Freiwunsch behalten</button><button id="clearAll" class="danger">Alle Schichten entfernen</button></div>
-  <div id="status" class="status"></div><h2 class="table-title">Dienstplantabelle</h2><div class="table-scroll"><table id="planTable" class="plan-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div><p class="hint">Zellen antippen, danach eine Schichtart wählen. Mehrfachauswahl ist möglich. Nacht-Obergrenze (Basis): leer = unbegrenzt; das Monatslimit wird anhand der eingetragenen Urlaubstage U automatisch gerundet.</p>
+  <div id="status" class="status"></div><h2 class="table-title">Dienstplantabelle</h2><div class="table-scroll"><table id="planTable" class="plan-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div><p class="hint">Zellen antippen, danach eine Schichtart wählen. Mehrfachauswahl ist möglich. Nacht-Ziel (Basis): leer = kein Ziel. Das Monatsziel wird anhand der eingetragenen Urlaubstage U gerundet und bei der Automatik bevorzugt, aber nicht als harte Grenze erzwungen. Nach einem Nachtdienst wird am Folgetag für dieselbe Person weder Nacht noch Begleit zugelassen.</p>
 </section>
 <section id="overview" class="panel">
   <div class="overview-heading">
@@ -41,7 +41,7 @@
   <div class="settings-grid"><div><h2>Schulferien</h2><div id="vacations"></div><button id="addVacation">Ferienzeitraum hinzufügen</button></div><div><h2>Feiertage</h2><div id="holidays"></div><button id="addHoliday">Feiertag hinzufügen</button></div></div>
 </section>
 </main>
-<footer>Dienstplan-App v7 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
+<footer>Dienstplan-App v8 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
 <script src="engine.js"></script><script src="app.js"></script>
 </body>
 </html>

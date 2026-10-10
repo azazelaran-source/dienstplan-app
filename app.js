@@ -29,8 +29,8 @@ function renderPlan(){
     d.cells.forEach((c,i)=>{const key=d.date+'|'+i,cls=c?c.type.toLowerCase():'',txt=c?SHIFT_LABELS[c.type]:'';h+=`<td class="shift-cell ${cls} ${selected.has(key)?'selected':''}" data-date="${d.date}" data-emp="${i}">${txt}${c&&c.automatic?'<span class="auto-badge">auto</span>':''}</td>`});h+='</tr>';
   }
   h+='<tr class="hours-row"><th>Stunden Soll</th>';state.employees.forEach((e,i)=>h+=`<td><input type="number" step="0.1" class="target" data-emp="${i}" value="${Number(e.target||0)}"></td>`);h+='</tr>';
-  h+='<tr class="hours-row night-limit-row"><th>Nacht-Obergrenze (Basis)</th>';state.employees.forEach((e,i)=>h+=`<td><input type="number" min="0" step="1" class="night-max" data-emp="${i}" value="${e.night_max===null||e.night_max===undefined?'':Number(e.night_max)}" placeholder="–"></td>`);h+='</tr>';
-  h+='<tr class="hours-row night-limit-row"><th>Nacht-Ziel/Limit nach Urlaub</th>';state.employees.forEach(e=>h+=`<td class="${e.nightLimitExceeded?'limit-exceeded':''}">${e.nightLimit===null?'–':fmt(e.nightLimit)}</td>`);h+='</tr>';
+  h+='<tr class="hours-row night-limit-row"><th>Nacht-Ziel (Basis)</th>';state.employees.forEach((e,i)=>h+=`<td><input type="number" min="0" step="1" class="night-max" data-emp="${i}" value="${e.night_max===null||e.night_max===undefined?'':Number(e.night_max)}" placeholder="–"></td>`);h+='</tr>';
+  h+='<tr class="hours-row night-limit-row"><th>Nacht-Ziel nach Urlaub</th>';state.employees.forEach(e=>h+=`<td class="${e.nightLimitExceeded?'limit-exceeded':''}">${e.nightLimit===null?'–':fmt(e.nightLimit)}</td>`);h+='</tr>';
   h+='<tr class="hours-row night-limit-row"><th>Nachtdienste Ist</th>';state.employees.forEach(e=>h+=`<td class="${e.nightLimitExceeded?'limit-exceeded':''}">${fmt(e.nightCount)}</td>`);h+='</tr>';
   h+='<tr class="hours-row"><th>Stunden Ist</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.actual)}</td>`);h+='</tr>';
   h+='<tr class="hours-row"><th>Differenz</th>';state.employees.forEach(e=>h+=`<td>${fmt(e.difference)}</td>`);h+='</tr>';
@@ -43,7 +43,18 @@ function renderPlan(){
 }
 function saveEmployees(){state.employees.forEach((e,i)=>{const rawNightMax=document.querySelector(`.night-max[data-emp="${i}"]`)?.value??'';persisted.employees[i]={name:document.querySelector(`.emp-name[data-emp="${i}"]`)?.value||'',target:Number(document.querySelector(`.target[data-emp="${i}"]`)?.value||0),night_max:rawNightMax===''?null:Math.max(0,Math.round(Number(rawNightMax)||0))}});saveState();refresh(state.current_month)}
 function selectedCells(){return [...selected].map(k=>{const [date,employee]=k.split('|');return {date,employee:Number(employee)}})}
-function mark(type){if(!selected.size)return showStatus('Bitte zuerst mindestens eine Dienstplanzelle auswählen.',true);const cells=selectedCells();let n=0,blocked=0;for(const c of cells){if(!String(persisted.employees[c.employee]?.name||'').trim())continue;const d=Engine.parseDate(c.date),existing=Engine.getShift(persisted,d,c.employee);if(type==='N'&&!Engine.canSetNightWithinLimit(persisted,d,c.employee)){blocked++;continue;}Engine.setShift(persisted,d,c.employee,type,false);n++}saveState();const month=state.current_month;refresh(month);showStatus(`${n} Zelle(n) markiert.${blocked?` ${blocked} Nachtdienst(e) wegen der Nacht-Obergrenze nicht gesetzt.`:''}`,blocked>0&&n===0)}
+function mark(type){
+  if(!selected.size)return showStatus('Bitte zuerst mindestens eine Dienstplanzelle auswählen.',true);
+  const cells=selectedCells();let n=0,blocked=0;
+  for(const c of cells){
+    if(!String(persisted.employees[c.employee]?.name||'').trim())continue;
+    const d=Engine.parseDate(c.date);
+    if(['N','B'].includes(type)&&!Engine.canSetDutyRespectingNightRest(persisted,d,c.employee,type)){blocked++;continue;}
+    Engine.setShift(persisted,d,c.employee,type,false);n++;
+  }
+  saveState();const month=state.current_month;refresh(month);
+  showStatus(`${n} Zelle(n) markiert.${blocked?` ${blocked} Eintrag/Einträge wegen der Ruhezeitregel nach Nachtdienst nicht gesetzt.`:''}`,blocked>0&&n===0);
+}
 function clearSelected(){if(!selected.size)return showStatus('Bitte zuerst Zellen auswählen.',true);let n=0;for(const c of selectedCells()){if(Engine.getShift(persisted,Engine.parseDate(c.date),c.employee)){Engine.clearShift(persisted,Engine.parseDate(c.date),c.employee);n++}}saveState();refresh(state.current_month);showStatus(`${n} markierte Schicht(en) gelöscht.`)}
 function monthLabel(monthKey){
   const [y,m]=monthKey.split('-').map(Number);

@@ -240,17 +240,9 @@ const Engine = (() => {
     const vacationDays=monthVacationDays(state,emp,monthKey), count=monthNightCount(state,emp,monthKey), limit=adjustedNightLimit(state,emp,monthKey);
     return {base,vacationDays,count,limit,remaining:limit===null?null:Math.max(0,limit-count),exceeded:limit!==null&&count>limit};
   }
-  function canAddNightWithinLimit(state,emp,monthKey){ const info=nightLimitInfo(state,emp,monthKey); return info.limit===null||info.count<info.limit; }
-  function canSetNightWithinLimit(state,d,emp){
-    const monthKey=dateKey(d).slice(0,7), raw=state.employees?.[emp]?.night_max;
-    if(raw===null||raw===undefined||raw==='') return true;
-    const base=Math.max(0,Math.round(Number(raw)||0)), days=monthDates(monthKey).length;
-    const info=nightLimitInfo(state,emp,monthKey), existing=getShift(state,d,emp);
-    const projectedVacation=Math.max(0,info.vacationDays-(existing?.type==='U'?1:0));
-    const projectedCount=info.count+(existing?.type==='N'?0:1);
-    const projectedLimit=Math.max(0,Math.round((base/days)*(days-projectedVacation)));
-    return projectedCount<=projectedLimit;
-  }
+  // Kompatibilitätsnamen aus v6/v7: Das Nachtlimit ist ab v8 nur noch ein weiches Ziel.
+  function canAddNightWithinLimit(){ return true; }
+  function canSetNightWithinLimit(){ return true; }
   function monthSpecialHours(state,emp,monthKey){
     let nightWork=0,nightReadiness=0,sundayHoliday=0;
     const dates=monthDates(monthKey), first=dates[0], last=dates[dates.length-1];
@@ -275,8 +267,18 @@ const Engine = (() => {
     return {nightWork:round2(nightWork),nightReadiness:round2(nightReadiness),sundayHoliday:round2(sundayHoliday)};
   }
 
-  function canPlaceNight(state,d,emp){ if(getShift(state,d,emp)) return false; const below=getShift(state,addDays(d,1),emp); return !below || ['T','S'].includes(below.type); }
-  function canPlaceAccompaniment(state,d,emp){ if(getShift(state,d,emp)) return false; const prev=getShift(state,addDays(d,-1),emp); return !(prev&&prev.type==='N'); }
+  function hasNightImmediatelyBefore(state,d,emp){ return getShift(state,addDays(d,-1),emp)?.type==='N'; }
+  function canSetDutyRespectingNightRest(state,d,emp,type){
+    if(type==='B') return !hasNightImmediatelyBefore(state,d,emp);
+    if(type==='N'){
+      if(hasNightImmediatelyBefore(state,d,emp)) return false;
+      const below=getShift(state,addDays(d,1),emp);
+      return !below || ['T','S'].includes(below.type);
+    }
+    return true;
+  }
+  function canPlaceNight(state,d,emp){ return !getShift(state,d,emp) && canSetDutyRespectingNightRest(state,d,emp,'N'); }
+  function canPlaceAccompaniment(state,d,emp){ return !getShift(state,d,emp) && canSetDutyRespectingNightRest(state,d,emp,'B'); }
 
   function wouldExceedTwoNightsInSixDays(state,d,emp){
     for(let offset=-5;offset<=0;offset++){
@@ -306,7 +308,17 @@ const Engine = (() => {
     const target=Number(state.employees[emp]?.target||0); const current=monthDistributionHours(state,emp,monthKey); const deficit=target-current; const h=hoursFor(state,d,type);
     let score=deficit-0.15*Math.abs(deficit-h); let nearby=0;
     for(let delta=-3;delta<=3;delta++){ const s=getShift(state,addDays(d,delta),emp); if(!s)continue; if(s.type===type) score-=5; if(s.type==='N') nearby++; }
-    if(type==='N') score-=6*nearby;
+    if(type==='N'){
+      score-=6*nearby;
+      const info=nightLimitInfo(state,emp,monthKey);
+      // Das urlaubskorrigierte Nacht-Ziel ist bewusst weich: deutlich bevorzugen,
+      // solange jemand unter Ziel liegt; oberhalb des Ziels nur stark abwerten, nie sperren.
+      if(info.limit!==null){
+        const delta=info.limit-info.count;
+        if(delta>0) score+=70+20*Math.min(delta,3);
+        else score-=90+35*Math.min(-delta,3);
+      }
+    }
     const before=freePairViolations(state,emp,monthKey).length; setShift(state,d,emp,type,true); const after=freePairViolations(state,emp,monthKey).length; clearShift(state,d,emp); if(after>before) score-=250*(after-before);
     return score;
   }
@@ -318,9 +330,19 @@ const Engine = (() => {
       if(n>1) msgs.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: mehr als ein Nachtdienst`);
       if(b>1) msgs.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: mehr als ein Begleitdienst`);
     }
+    const monthDays=monthDates(monthKey);
+    for(const d of monthDays) for(const e of active){
+      if(getShift(state,addDays(d,-1),e)?.type==='N' && ['N','B'].includes(getShift(state,d,e)?.type)){
+        msgs.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: ${state.employees[e].name} hat direkt nach einem Nachtdienst erneut Nacht/Begleit`);
+      }
+    }
+    // Monatsgrenze nach vorn ebenfalls prüfen (z. B. Nacht am 31. und Begleit am 1. des Folgemonats).
+    const lastDay=monthDays[monthDays.length-1];
     for(const e of active){
-      const info=nightLimitInfo(state,e,monthKey);
-      if(info.exceeded) msgs.push(`${state.employees[e].name}: Nachtdienst-Obergrenze überschritten (${info.count}/${info.limit})`);
+      if(getShift(state,lastDay,e)?.type==='N' && ['N','B'].includes(getShift(state,addDays(lastDay,1),e)?.type)){
+        const next=addDays(lastDay,1);
+        msgs.push(`${pad(next.getDate())}.${pad(next.getMonth()+1)}.: ${state.employees[e].name} hat direkt nach einem Nachtdienst erneut Nacht/Begleit`);
+      }
     }
     return msgs;
   }
@@ -331,9 +353,9 @@ const Engine = (() => {
     const messages=[]; const dates=[...monthDates(monthKey)].reverse();
     for(const d of dates){
       if(active.some(e=>getShift(state,d,e)?.type==='N')) continue;
-      let candidates=active.filter(e=>canAddNightWithinLimit(state,e,monthKey)&&canPlaceNight(state,d,e)&&!wouldExceedTwoNightsInSixDays(state,d,e)); let relaxed=false;
-      if(!candidates.length){ candidates=active.filter(e=>canAddNightWithinLimit(state,e,monthKey)&&canPlaceNight(state,d,e)); relaxed=!!candidates.length; }
-      if(!candidates.length){ messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: Nacht nicht besetzbar (Obergrenze oder andere Regeln)`); continue; }
+      let candidates=active.filter(e=>canPlaceNight(state,d,e)&&!wouldExceedTwoNightsInSixDays(state,d,e)); let relaxed=false;
+      if(!candidates.length){ candidates=active.filter(e=>canPlaceNight(state,d,e)); relaxed=!!candidates.length; }
+      if(!candidates.length){ messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: Nacht wegen Ruhezeit oder anderer Regeln nicht besetzbar`); continue; }
       let best=candidates[0],bestScore=-Infinity; for(const e of candidates){ const s=candidateScore(state,e,d,'N',monthKey); if(s>bestScore){bestScore=s;best=e;} }
       setShift(state,d,best,'N',true); if(relaxed) messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: 2-Nächte-in-6-Tagen-Regel ausnahmsweise überschritten (${state.employees[best].name})`);
     }
@@ -349,7 +371,7 @@ const Engine = (() => {
     for(const e of active){ const v=freePairViolations(state,e,monthKey); if(v.length) messages.push(`${state.employees[e].name}: Zwei-Tage-frei-Ziel konnte in ${v.length} gleitenden 14-Tage-Fenster(n) nicht vollständig eingehalten werden`); }
     for(const e of active){
       const info=nightLimitInfo(state,e,monthKey);
-      if(info.limit!==null) messages.push(`${state.employees[e].name}: Nachtdienste ${info.count}/${info.limit} (Obergrenze ${info.base}, Urlaub ${info.vacationDays} Tag${info.vacationDays===1?'':'e'})`);
+      if(info.limit!==null) messages.push(`${state.employees[e].name}: Nachtdienste ${info.count}/${info.limit} (weiches Ziel; Basis ${info.base}, Urlaub ${info.vacationDays} Tag${info.vacationDays===1?'':'e'})`);
     }
     return {ok:true,messages:messages.length?messages:['Nacht- und Begleitdienste wurden verteilt.']};
   }
@@ -384,7 +406,7 @@ const Engine = (() => {
   return {
     defaultState,sanitizeState,parseDate,dateKey,monthDates,activeEmployeeIndexes,getShift,setShift,clearShift,
     isSchoolVacation,isHoliday,isBridgeDay,hoursFor,monthActualHours,monthDistributionHours,monthVacationDays,monthNightCount,adjustedNightLimit,nightLimitInfo,canAddNightWithinLimit,canSetNightWithinLimit,monthSpecialHours,
-    nightShiftBreakdown,normalizeClock,canPlaceNight,canPlaceAccompaniment,wouldExceedTwoNightsInSixDays,
+    nightShiftBreakdown,normalizeClock,hasNightImmediatelyBefore,canSetDutyRespectingNightRest,canPlaceNight,canPlaceAccompaniment,wouldExceedTwoNightsInSixDays,
     freePairViolations,autoSchedule,fillTeam,clearAutomatic,clearExceptLeaveFree,clearAll,clientPayload
   };
 })();

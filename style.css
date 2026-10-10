@@ -24,12 +24,13 @@ main{padding:18px;max-width:1600px;margin:auto}.panel{display:none}.panel.active
 
 .supplement-row th,.supplement-row td{background:#eef4fb;font-weight:700}.supplement-row th{white-space:normal;line-height:1.15}.night-grid{display:grid;gap:18px}.night-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px}.night-card h3{margin:0 0 10px;font-size:1rem}.night-table th,.night-table td{min-width:118px}.night-table th:first-child,.night-table td:first-child{min-width:120px}.clock-input{width:82px;text-align:center;font-variant-numeric:tabular-nums}@media(max-width:720px){.night-card{padding:8px}.night-table th,.night-table td{min-width:105px}.clock-input{width:76px}.supplement-row th{font-size:.78rem}}
 
-.night-limit-row th,.night-limit-row td{background:#f1f7f2}.night-limit-row input{width:82px}.limit-exceeded{background:#fff0ef!important;color:var(--danger);font-weight:800}
+.night-limit-row th,.night-limit-row td{background:#f1f7f2}.night-limit-row input{width:82px}
 
 
 @media print{
-  @page{size:A4 landscape;margin:9mm}
-  body.print-overview{background:#fff;color:#111}
+  @page{size:A4 landscape;margin:5mm}
+  html,body{width:100%;height:auto;margin:0!important;padding:0!important}
+  body.print-overview{background:#fff;color:#111;font-size:7.5pt}
   body.print-overview header,
   body.print-overview .tabs,
   body.print-overview #plan,
@@ -37,17 +38,19 @@ main{padding:18px;max-width:1600px;margin:auto}.panel{display:none}.panel.active
   body.print-overview footer,
   body.print-overview #exportOverviewPdf,
   body.print-overview .overview-print-hint{display:none!important}
-  body.print-overview main{max-width:none;padding:0;margin:0}
-  body.print-overview #overview{display:block!important}
-  body.print-overview .overview-heading{margin:0 0 6mm}
-  body.print-overview .overview-heading .table-title{font-size:16pt;margin:0}
-  body.print-overview .overview-weeks{display:block}
-  body.print-overview .overview-week-card{box-shadow:none;border:1.5pt solid #245a91;border-radius:7pt;margin:0 0 5mm;break-inside:avoid;page-break-inside:avoid;overflow:visible}
-  body.print-overview .overview-week-table{min-width:0!important;width:100%;table-layout:fixed}
+  body.print-overview main{width:100%;max-width:none;padding:0!important;margin:0!important}
+  body.print-overview #overview{display:block!important;width:100%;margin:0;padding:0}
+  body.print-overview .overview-heading{margin:0 0 2mm;min-height:0}
+  body.print-overview .overview-heading .table-title{font-size:11pt;line-height:1;margin:0}
+  body.print-overview .overview-weeks{display:grid;grid-template-columns:1fr;gap:2mm;width:100%}
+  body.print-overview .overview-week-card{box-shadow:none;border:.8pt solid #245a91;border-radius:2mm;margin:0;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
+  body.print-overview .overview-week-table{min-width:0!important;width:100%;table-layout:fixed;border-collapse:collapse}
   body.print-overview .overview-week-table th,
-  body.print-overview .overview-week-table td{padding:5pt 4pt;font-size:9pt}
-  body.print-overview .overview-row-label{width:22mm}
-  body.print-overview .overview-name-cell{height:25pt}
+  body.print-overview .overview-week-table td{padding:1.5mm .9mm;font-size:8pt;line-height:1.05;min-width:0;height:auto}
+  body.print-overview .overview-row-label{width:20mm;font-size:7.8pt}
+  body.print-overview .overview-weekday{font-size:8.2pt;line-height:1}
+  body.print-overview .overview-date{font-size:7.4pt;line-height:1;margin-top:.6mm}
+  body.print-overview .overview-name-cell{height:6.2mm;font-size:8pt}
   body.print-overview .overview-day-head,
   body.print-overview .overview-name-cell,
   body.print-overview .overview-row-label{-webkit-print-color-adjust:exact;print-color-adjust:exact}
