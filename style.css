@@ -14,9 +14,9 @@ main{padding:18px;max-width:1600px;margin:auto}.panel{display:none}.panel.active
 .status{display:none;background:#eef4ff;border:1px solid #bfd1f1;padding:10px 12px;border-radius:8px;margin:8px 0 12px;white-space:pre-line}.status.show{display:block}.status.error{background:#fff0ef;border-color:#f0b7b3}
 .table-scroll{overflow:auto;border:1px solid var(--border);border-radius:10px;background:white;max-width:100%}table{border-collapse:separate;border-spacing:0;width:100%}th,td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px 7px;text-align:center;min-width:94px}th:first-child,td:first-child{position:sticky;left:0;z-index:8;background:#f7f9fc;min-width:132px}thead th{position:sticky;top:0;z-index:9;background:#f0f3f8;font-weight:700}thead th:first-child{z-index:10}.plan-table td.shift-cell{height:38px;cursor:pointer;user-select:none}.plan-table td.shift-cell.selected{outline:3px solid #1b4f9b;outline-offset:-3px}.plan-table td.n{background:var(--n);color:white}.plan-table td.b{background:var(--b);color:white}.plan-table td.u{background:var(--u);color:white}.plan-table td.f{background:var(--f);color:white}.plan-table td.s{background:var(--s)}.plan-table td.t{background:var(--t)}
 .date-cell.special{background:#ffcccc!important}.date-cell .meta{display:block;font-size:.72rem;color:var(--muted);font-weight:500}.auto-badge{font-size:.65rem;opacity:.8;display:block}.emp-name{width:100%;min-width:104px}.hours-row td,.hours-row th{background:#f8fafc;font-weight:600}.hours-row input{width:90px}.hint{color:var(--muted);font-size:.85rem}
-.overview-table th{min-width:120px}.overview-table .date{font-weight:800}.overview-table .special{background:#ffcccc}.overview-table .label{font-weight:700;text-align:left;position:sticky;left:0;background:#f7f9fc}.overview-table td{height:38px}
+.overview-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px 0 8px}.overview-heading .table-title{margin:10px 0 4px}.overview-print-hint{margin:0 0 12px;color:var(--muted);font-size:.82rem}.overview-weeks{display:grid;gap:16px}.overview-week-card{overflow:hidden;border:2px solid #245a91;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(24,32,42,.05)}.overview-week-table{table-layout:fixed;border-collapse:collapse}.overview-week-table th,.overview-week-table td{position:static;min-width:0;border-right:1px solid #d7e0ea;border-bottom:1px solid #d7e0ea;padding:8px 6px}.overview-week-table tr:last-child th,.overview-week-table tr:last-child td{border-bottom:0}.overview-week-table th:last-child,.overview-week-table td:last-child{border-right:0}.overview-row-label{width:120px;background:#f2f5f9!important;text-align:left;font-weight:800;color:#25364a}.overview-day-head{background:#e9f2fd!important;font-weight:800;line-height:1.1}.overview-weekday{display:block;font-size:.95rem}.overview-date{display:block;font-size:.85rem;font-weight:650;margin-top:3px}.overview-day-head.weekend,.overview-name-cell.weekend{background:#fff5e2!important}.overview-day-head.special{box-shadow:inset 0 4px 0 #d88383}.overview-name-cell{height:42px;font-weight:650;font-size:.96rem}.overview-night-row .overview-name-cell{background:#f5f8fc}.overview-day-row .overview-name-cell{background:#fbfcfd}.night-label{background:#edf2fb!important}.day-label{background:#eef8f2!important}
 .settings-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.filelabel input{display:none}.settings-table input{width:88px}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px}.setting-row{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}.setting-row button{padding:6px 9px}.setting-row input[type=date]{flex:1;min-width:145px}h2{font-size:1.1rem;margin:20px 0 8px}footer{padding:16px 18px;color:var(--muted);font-size:.8rem;text-align:center}
-@media(max-width:720px){header{align-items:flex-start;flex-direction:column;padding:12px;position:static}.tabs{top:0;padding-left:8px;overflow:auto}.sticky-tools{top:48px}.sub{display:none}main{padding:10px}.monthbox{width:100%}.monthbox input{flex:1}.settings-grid{grid-template-columns:1fr}.toolbar button{flex:1 1 auto}.secondary button{font-size:.82rem}.plan-table th,.plan-table td{min-width:84px;padding:5px}.plan-table th:first-child,.plan-table td:first-child{min-width:112px}.emp-name{min-width:80px;font-size:.82rem}.overview-table th{min-width:100px}}
+@media(max-width:720px){header{align-items:flex-start;flex-direction:column;padding:12px;position:static}.tabs{top:0;padding-left:8px;overflow:auto}.sticky-tools{top:48px}.sub{display:none}main{padding:10px}.monthbox{width:100%}.monthbox input{flex:1}.settings-grid{grid-template-columns:1fr}.toolbar button{flex:1 1 auto}.secondary button{font-size:.82rem}.plan-table th,.plan-table td{min-width:84px;padding:5px}.plan-table th:first-child,.plan-table td:first-child{min-width:112px}.emp-name{min-width:80px;font-size:.82rem}.overview-week-card{overflow-x:auto}.overview-week-table{min-width:760px}.overview-row-label{width:105px}}
 #installApp{white-space:nowrap}
 @media (display-mode: standalone){#installApp{display:none}}
 
@@ -25,3 +25,30 @@ main{padding:18px;max-width:1600px;margin:auto}.panel{display:none}.panel.active
 .supplement-row th,.supplement-row td{background:#eef4fb;font-weight:700}.supplement-row th{white-space:normal;line-height:1.15}.night-grid{display:grid;gap:18px}.night-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px}.night-card h3{margin:0 0 10px;font-size:1rem}.night-table th,.night-table td{min-width:118px}.night-table th:first-child,.night-table td:first-child{min-width:120px}.clock-input{width:82px;text-align:center;font-variant-numeric:tabular-nums}@media(max-width:720px){.night-card{padding:8px}.night-table th,.night-table td{min-width:105px}.clock-input{width:76px}.supplement-row th{font-size:.78rem}}
 
 .night-limit-row th,.night-limit-row td{background:#f1f7f2}.night-limit-row input{width:82px}.limit-exceeded{background:#fff0ef!important;color:var(--danger);font-weight:800}
+
+
+@media print{
+  @page{size:A4 landscape;margin:9mm}
+  body.print-overview{background:#fff;color:#111}
+  body.print-overview header,
+  body.print-overview .tabs,
+  body.print-overview #plan,
+  body.print-overview #settings,
+  body.print-overview footer,
+  body.print-overview #exportOverviewPdf,
+  body.print-overview .overview-print-hint{display:none!important}
+  body.print-overview main{max-width:none;padding:0;margin:0}
+  body.print-overview #overview{display:block!important}
+  body.print-overview .overview-heading{margin:0 0 6mm}
+  body.print-overview .overview-heading .table-title{font-size:16pt;margin:0}
+  body.print-overview .overview-weeks{display:block}
+  body.print-overview .overview-week-card{box-shadow:none;border:1.5pt solid #245a91;border-radius:7pt;margin:0 0 5mm;break-inside:avoid;page-break-inside:avoid;overflow:visible}
+  body.print-overview .overview-week-table{min-width:0!important;width:100%;table-layout:fixed}
+  body.print-overview .overview-week-table th,
+  body.print-overview .overview-week-table td{padding:5pt 4pt;font-size:9pt}
+  body.print-overview .overview-row-label{width:22mm}
+  body.print-overview .overview-name-cell{height:25pt}
+  body.print-overview .overview-day-head,
+  body.print-overview .overview-name-cell,
+  body.print-overview .overview-row-label{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

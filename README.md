@@ -1,8 +1,8 @@
-# Dienstplan Handy-App – Version v6
+# Dienstplan Handy-App – Version v7
 
 Die App läuft vollständig im Browser bzw. als installierbare PWA. Es wird kein Server benötigt; Daten werden lokal auf dem jeweiligen Gerät gespeichert.
 
-## Neu in v6
+## Neu in v7
 - Pro Mitarbeiter gibt es eine editierbare **Nacht-Obergrenze**. Leer bedeutet: keine Begrenzung.
 - Für den gewählten Monat wird daraus automatisch das gerundete **Nacht-Ziel nach Urlaub** berechnet: `(Obergrenze / Kalendertage) × (Kalendertage − eingetragene Urlaubstage U)`.
 - Die Obergrenze ist hart: Automatische und manuelle neue Nachtdienste werden oberhalb des berechneten Monatslimits nicht vergeben. Bereits vorhandene Pläne, die nachträglich über die Grenze geraten, werden markiert und müssen vor einer neuen Automatik-Verteilung korrigiert werden.
@@ -34,3 +34,9 @@ Die App läuft vollständig im Browser bzw. als installierbare PWA. Es wird kein
 
 ## Datensicherheit
 Die Dienstplandaten liegen im lokalen Browser-Speicher des Geräts. Das öffentliche Repository enthält keine eingetragenen Mitarbeiterdaten. Regelmäßig unter `Einstellungen > Sicherung herunterladen` eine JSON-Sicherung erstellen. Das Löschen der Website-Daten entfernt auch die lokal gespeicherten Dienstplandaten.
+
+
+## Neu in v7
+- Wochenübersicht als klar getrennte Wochenblöcke: Datum oben, Nachtdienst darüber vor Tagdienst.
+- Samstag/Sonntag dezent farblich abgesetzt und Wochen mit kräftigerem Außenrahmen.
+- PDF-Export über die Schaltfläche „Wochenübersicht als PDF“; im System-Druckdialog „Als PDF speichern“ wählen.

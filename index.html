@@ -24,7 +24,14 @@
   <div class="toolbar secondary"><button id="autoSchedule" class="primary">Automatisch verteilen</button><button id="fillTeam">Teamtage auffüllen</button><button id="clearAuto">Automatische entfernen</button><button id="clearExcept">Nur Urlaub/Freiwunsch behalten</button><button id="clearAll" class="danger">Alle Schichten entfernen</button></div>
   <div id="status" class="status"></div><h2 class="table-title">Dienstplantabelle</h2><div class="table-scroll"><table id="planTable" class="plan-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div><p class="hint">Zellen antippen, danach eine Schichtart wählen. Mehrfachauswahl ist möglich. Nacht-Obergrenze (Basis): leer = unbegrenzt; das Monatslimit wird anhand der eingetragenen Urlaubstage U automatisch gerundet.</p>
 </section>
-<section id="overview" class="panel"><h2 class="table-title">Wochenübersicht</h2><div class="table-scroll"><table id="overviewTable" class="overview-table"><tbody><tr><td>Wird geladen …</td></tr></tbody></table></div></section>
+<section id="overview" class="panel">
+  <div class="overview-heading">
+    <h2 id="overviewTitle" class="table-title">Wochenübersicht</h2>
+    <button id="exportOverviewPdf" class="primary">Wochenübersicht als PDF</button>
+  </div>
+  <p class="overview-print-hint">Beim Export im Druckdialog „Als PDF speichern“ wählen.</p>
+  <div id="overviewWeeks" class="overview-weeks"><p>Wird geladen …</p></div>
+</section>
 <section id="settings" class="panel">
   <div class="settings-actions"><button id="saveSettings" class="primary">Einstellungen speichern</button><button id="exportBtn">Sicherung herunterladen</button><label class="buttonlike filelabel">Sicherung importieren<input id="importFile" type="file" accept="application/json"></label></div>
   <h2>Nachtdienst-Zeiten</h2>
@@ -34,7 +41,7 @@
   <div class="settings-grid"><div><h2>Schulferien</h2><div id="vacations"></div><button id="addVacation">Ferienzeitraum hinzufügen</button></div><div><h2>Feiertage</h2><div id="holidays"></div><button id="addHoliday">Feiertag hinzufügen</button></div></div>
 </section>
 </main>
-<footer>Dienstplan-App v6 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
+<footer>Dienstplan-App v7 · Installierbare Offline-App · Daten werden ausschließlich auf diesem Gerät gespeichert.</footer>
 <script src="engine.js"></script><script src="app.js"></script>
 </body>
 </html>

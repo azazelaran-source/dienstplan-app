@@ -45,7 +45,40 @@ function saveEmployees(){state.employees.forEach((e,i)=>{const rawNightMax=docum
 function selectedCells(){return [...selected].map(k=>{const [date,employee]=k.split('|');return {date,employee:Number(employee)}})}
 function mark(type){if(!selected.size)return showStatus('Bitte zuerst mindestens eine Dienstplanzelle auswählen.',true);const cells=selectedCells();let n=0,blocked=0;for(const c of cells){if(!String(persisted.employees[c.employee]?.name||'').trim())continue;const d=Engine.parseDate(c.date),existing=Engine.getShift(persisted,d,c.employee);if(type==='N'&&!Engine.canSetNightWithinLimit(persisted,d,c.employee)){blocked++;continue;}Engine.setShift(persisted,d,c.employee,type,false);n++}saveState();const month=state.current_month;refresh(month);showStatus(`${n} Zelle(n) markiert.${blocked?` ${blocked} Nachtdienst(e) wegen der Nacht-Obergrenze nicht gesetzt.`:''}`,blocked>0&&n===0)}
 function clearSelected(){if(!selected.size)return showStatus('Bitte zuerst Zellen auswählen.',true);let n=0;for(const c of selectedCells()){if(Engine.getShift(persisted,Engine.parseDate(c.date),c.employee)){Engine.clearShift(persisted,Engine.parseDate(c.date),c.employee);n++}}saveState();refresh(state.current_month);showStatus(`${n} markierte Schicht(en) gelöscht.`)}
-function renderOverview(){let h='<thead><tr><th></th><th>Montag</th><th>Dienstag</th><th>Mittwoch</th><th>Donnerstag</th><th>Freitag</th><th>Samstag</th><th>Sonntag</th></tr></thead><tbody>';state.overview.forEach(week=>{h+='<tr><th class="label">Datum</th>'+week.map(d=>d.date?`<td class="date ${d.special?'special':''}">${String(d.day).padStart(2,'0')}</td>`:'<td></td>').join('')+'</tr>';h+='<tr><th class="label">Nacht</th>'+week.map(d=>`<td>${esc(d.night||'')}</td>`).join('')+'</tr>';h+='<tr><th class="label">Begleit</th>'+week.map(d=>`<td>${esc(d.accomp||'')}</td>`).join('')+'</tr>'});h+='</tbody>';el('overviewTable').innerHTML=h}
+function monthLabel(monthKey){
+  const [y,m]=monthKey.split('-').map(Number);
+  return new Intl.DateTimeFormat('de-DE',{month:'long',year:'numeric'}).format(new Date(y,m-1,1));
+}
+function overviewDateLabel(item,weekdayIndex){
+  if(!item?.date)return '';
+  const d=Engine.parseDate(item.date);
+  const short=['Mo','Di','Mi','Do','Fr','Sa','So'][weekdayIndex];
+  return `<span class="overview-weekday">${short}</span><span class="overview-date">${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.</span>`;
+}
+function renderOverview(){
+  el('overviewTitle').textContent=`Wochenübersicht – ${monthLabel(state.current_month)}`;
+  let h='';
+  state.overview.forEach((week,weekIndex)=>{
+    const hasDays=week.some(d=>d.date);
+    if(!hasDays)return;
+    h+=`<div class="overview-week-card" data-week="${weekIndex}"><table class="overview-week-table"><tbody>`;
+    h+='<tr class="overview-date-row"><th class="overview-row-label">Datum</th>';
+    week.forEach((d,i)=>{const weekend=i>=5?' weekend':'';const special=d?.special?' special':'';h+=d?.date?`<th class="overview-day-head${weekend}${special}">${overviewDateLabel(d,i)}</th>`:`<th class="overview-day-head empty${weekend}"></th>`});
+    h+='</tr>';
+    h+='<tr class="overview-night-row"><th class="overview-row-label night-label">Nachtdienst</th>';
+    week.forEach((d,i)=>h+=`<td class="overview-name-cell${i>=5?' weekend':''}">${esc(d?.night||'')}</td>`);h+='</tr>';
+    h+='<tr class="overview-day-row"><th class="overview-row-label day-label">Tagdienst</th>';
+    week.forEach((d,i)=>h+=`<td class="overview-name-cell${i>=5?' weekend':''}">${esc(d?.accomp||'')}</td>`);h+='</tr>';
+    h+='</tbody></table></div>';
+  });
+  el('overviewWeeks').innerHTML=h||'<p>Für diesen Monat sind keine Tage vorhanden.</p>';
+}
+function exportOverviewPdf(){
+  document.body.classList.add('print-overview');
+  const cleanup=()=>document.body.classList.remove('print-overview');
+  window.addEventListener('afterprint',cleanup,{once:true});
+  setTimeout(()=>{window.print();setTimeout(cleanup,1000)},50);
+}
 
 function renderNightSettings(){
   const times=state.settings.night_times||{};
@@ -101,6 +134,7 @@ function initEvents(){
   el('clearExcept').onclick=()=>{if(!confirm('Alle Schichten außer Urlaub und Freiwunsch dieses Monats entfernen?'))return;const n=Engine.clearExceptLeaveFree(persisted,state.current_month);saveState();refresh(state.current_month);showStatus(`${n} Schicht(en) entfernt; Urlaub/Freiwunsch bleiben.`)};
   el('clearAll').onclick=()=>{if(!confirm('Wirklich alle Schichten dieses Monats entfernen?'))return;const n=Engine.clearAll(persisted,state.current_month);saveState();refresh(state.current_month);showStatus(`${n} Schicht(en) des Monats entfernt.`)};
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');el(b.dataset.tab).classList.add('active')});
+  el('exportOverviewPdf').onclick=exportOverviewPdf;
   el('saveSettings').onclick=saveSettings;el('addVacation').onclick=()=>{state.settings.vacations.push(['','']);renderSettings()};el('addHoliday').onclick=()=>{state.settings.holidays.push('');renderSettings()};el('exportBtn').onclick=downloadBackup;el('installApp').onclick=tryInstall;
   el('importFile').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{persisted=Engine.sanitizeState(JSON.parse(await f.text()));saveState();refresh(persisted.current_month);showStatus('Sicherung importiert.')}catch(e){showStatus('Import fehlgeschlagen: '+e.message,true)}};
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;el('installApp').textContent='App installieren'});
