@@ -1,6 +1,13 @@
-# Dienstplan Handy-App – Version v5
+# Dienstplan Handy-App – Version v6
 
 Die App läuft vollständig im Browser bzw. als installierbare PWA. Es wird kein Server benötigt; Daten werden lokal auf dem jeweiligen Gerät gespeichert.
+
+## Neu in v6
+- Pro Mitarbeiter gibt es eine editierbare **Nacht-Obergrenze**. Leer bedeutet: keine Begrenzung.
+- Für den gewählten Monat wird daraus automatisch das gerundete **Nacht-Ziel nach Urlaub** berechnet: `(Obergrenze / Kalendertage) × (Kalendertage − eingetragene Urlaubstage U)`.
+- Die Obergrenze ist hart: Automatische und manuelle neue Nachtdienste werden oberhalb des berechneten Monatslimits nicht vergeben. Bereits vorhandene Pläne, die nachträglich über die Grenze geraten, werden markiert und müssen vor einer neuen Automatik-Verteilung korrigiert werden.
+- Zusätzlich zeigt die Haupttabelle die bereits eingetragenen Nachtdienste je Mitarbeiter an.
+- Die sonstige Gewichtung und Verteilungslogik der Automatik bleibt unverändert, damit die Wirkung der Obergrenze separat getestet werden kann.
 
 ## Neu in v5
 - Nachtdienste bestehen aus zwei echten Zeitblöcken: Hauptblock am Starttag und Frühblock am Folgetag.

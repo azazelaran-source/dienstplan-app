@@ -112,9 +112,9 @@ const Engine = (() => {
   function defaultState(){
     const names=['','','','','','','','','',''];
     return {
-      version:3,
+      version:4,
       current_month:'2026-02',
-      employees:names.map(name=>({name,target:0})),
+      employees:names.map(name=>({name,target:0,night_max:null})),
       shifts:{},
       settings:{
         vacations:clone(DEFAULT_VACATIONS),
@@ -133,7 +133,9 @@ const Engine = (() => {
       out.employees=[];
       for(let i=0;i<10;i++){
         const e=(raw.employees[i]&&typeof raw.employees[i]==='object')?raw.employees[i]:{};
-        out.employees.push({name:String(e.name||'').slice(0,80),target:Number(e.target||0)||0});
+        const rawNightMax=e.night_max;
+        const nightMax=(rawNightMax===null||rawNightMax===undefined||rawNightMax==='')?null:Math.max(0,Math.round(Number(rawNightMax)||0));
+        out.employees.push({name:String(e.name||'').slice(0,80),target:Number(e.target||0)||0,night_max:nightMax});
       }
     }
     if(raw.shifts && typeof raw.shifts==='object'){
@@ -153,7 +155,7 @@ const Engine = (() => {
       out.settings.shift_times=mergeShiftTimes(raw.settings.shift_times);
       out.settings.night_times=mergeNightTimes(raw.settings.night_times);
     }
-    out.version=3;
+    out.version=4;
     return out;
   }
 
@@ -223,6 +225,32 @@ const Engine = (() => {
 
   function monthActualHours(state,emp,monthKey){ let t=0; for(const d of monthDates(monthKey)){ const s=getShift(state,d,emp); if(s)t+=hoursFor(state,d,s.type); } return round2(t); }
   function monthDistributionHours(state,emp,monthKey){ let t=0; for(const d of monthDates(monthKey)){ const s=getShift(state,d,emp); if(s&&s.type!=='U') t+=hoursFor(state,d,s.type); } return round2(t); }
+  function monthVacationDays(state,emp,monthKey){ let n=0; for(const d of monthDates(monthKey)) if(getShift(state,d,emp)?.type==='U') n++; return n; }
+  function monthNightCount(state,emp,monthKey){ let n=0; for(const d of monthDates(monthKey)) if(getShift(state,d,emp)?.type==='N') n++; return n; }
+  function adjustedNightLimit(state,emp,monthKey){
+    const raw=state.employees?.[emp]?.night_max;
+    if(raw===null||raw===undefined||raw==='') return null;
+    const base=Math.max(0,Math.round(Number(raw)||0));
+    const days=monthDates(monthKey).length, vacationDays=monthVacationDays(state,emp,monthKey);
+    return Math.max(0,Math.round((base/days)*(days-vacationDays)));
+  }
+  function nightLimitInfo(state,emp,monthKey){
+    const raw=state.employees?.[emp]?.night_max;
+    const base=(raw===null||raw===undefined||raw==='')?null:Math.max(0,Math.round(Number(raw)||0));
+    const vacationDays=monthVacationDays(state,emp,monthKey), count=monthNightCount(state,emp,monthKey), limit=adjustedNightLimit(state,emp,monthKey);
+    return {base,vacationDays,count,limit,remaining:limit===null?null:Math.max(0,limit-count),exceeded:limit!==null&&count>limit};
+  }
+  function canAddNightWithinLimit(state,emp,monthKey){ const info=nightLimitInfo(state,emp,monthKey); return info.limit===null||info.count<info.limit; }
+  function canSetNightWithinLimit(state,d,emp){
+    const monthKey=dateKey(d).slice(0,7), raw=state.employees?.[emp]?.night_max;
+    if(raw===null||raw===undefined||raw==='') return true;
+    const base=Math.max(0,Math.round(Number(raw)||0)), days=monthDates(monthKey).length;
+    const info=nightLimitInfo(state,emp,monthKey), existing=getShift(state,d,emp);
+    const projectedVacation=Math.max(0,info.vacationDays-(existing?.type==='U'?1:0));
+    const projectedCount=info.count+(existing?.type==='N'?0:1);
+    const projectedLimit=Math.max(0,Math.round((base/days)*(days-projectedVacation)));
+    return projectedCount<=projectedLimit;
+  }
   function monthSpecialHours(state,emp,monthKey){
     let nightWork=0,nightReadiness=0,sundayHoliday=0;
     const dates=monthDates(monthKey), first=dates[0], last=dates[dates.length-1];
@@ -290,18 +318,22 @@ const Engine = (() => {
       if(n>1) msgs.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: mehr als ein Nachtdienst`);
       if(b>1) msgs.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: mehr als ein Begleitdienst`);
     }
+    for(const e of active){
+      const info=nightLimitInfo(state,e,monthKey);
+      if(info.exceeded) msgs.push(`${state.employees[e].name}: Nachtdienst-Obergrenze überschritten (${info.count}/${info.limit})`);
+    }
     return msgs;
   }
 
   function autoSchedule(state,monthKey){
-    const errors=validateManualCounts(state,monthKey); if(errors.length) return {ok:false,messages:['Bitte zuerst Mehrfachbelegungen beheben.',...errors]};
+    const errors=validateManualCounts(state,monthKey); if(errors.length) return {ok:false,messages:['Bitte zuerst Konflikte im bestehenden Plan beheben.',...errors]};
     const active=activeEmployeeIndexes(state); if(!active.length) return {ok:false,messages:['Es sind keine Mitarbeiter eingetragen.']};
     const messages=[]; const dates=[...monthDates(monthKey)].reverse();
     for(const d of dates){
       if(active.some(e=>getShift(state,d,e)?.type==='N')) continue;
-      let candidates=active.filter(e=>canPlaceNight(state,d,e)&&!wouldExceedTwoNightsInSixDays(state,d,e)); let relaxed=false;
-      if(!candidates.length){ candidates=active.filter(e=>canPlaceNight(state,d,e)); relaxed=!!candidates.length; }
-      if(!candidates.length){ messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: Nacht nicht besetzbar`); continue; }
+      let candidates=active.filter(e=>canAddNightWithinLimit(state,e,monthKey)&&canPlaceNight(state,d,e)&&!wouldExceedTwoNightsInSixDays(state,d,e)); let relaxed=false;
+      if(!candidates.length){ candidates=active.filter(e=>canAddNightWithinLimit(state,e,monthKey)&&canPlaceNight(state,d,e)); relaxed=!!candidates.length; }
+      if(!candidates.length){ messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: Nacht nicht besetzbar (Obergrenze oder andere Regeln)`); continue; }
       let best=candidates[0],bestScore=-Infinity; for(const e of candidates){ const s=candidateScore(state,e,d,'N',monthKey); if(s>bestScore){bestScore=s;best=e;} }
       setShift(state,d,best,'N',true); if(relaxed) messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: 2-Nächte-in-6-Tagen-Regel ausnahmsweise überschritten (${state.employees[best].name})`);
     }
@@ -315,6 +347,10 @@ const Engine = (() => {
     }
     for(const d of monthDates(monthKey)) for(const e of active){ const s=getShift(state,d,e); if(s?.type==='N'){ const nxt=getShift(state,addDays(d,1),e); if(nxt&&!['T','S'].includes(nxt.type)) messages.push(`${pad(d.getDate())}.${pad(d.getMonth()+1)}.: ${state.employees[e].name} hat am Folgetag einen unzulässigen Dienst nach Nacht`); } }
     for(const e of active){ const v=freePairViolations(state,e,monthKey); if(v.length) messages.push(`${state.employees[e].name}: Zwei-Tage-frei-Ziel konnte in ${v.length} gleitenden 14-Tage-Fenster(n) nicht vollständig eingehalten werden`); }
+    for(const e of active){
+      const info=nightLimitInfo(state,e,monthKey);
+      if(info.limit!==null) messages.push(`${state.employees[e].name}: Nachtdienste ${info.count}/${info.limit} (Obergrenze ${info.base}, Urlaub ${info.vacationDays} Tag${info.vacationDays===1?'':'e'})`);
+    }
     return {ok:true,messages:messages.length?messages:['Nacht- und Begleitdienste wurden verteilt.']};
   }
 
@@ -336,6 +372,8 @@ const Engine = (() => {
     employees.forEach((e,i)=>{
       e.actual=String(e.name||'').trim()?monthActualHours(state,i,monthKey):0;
       e.difference=round2(e.actual-Number(e.target||0));
+      const nightInfo=String(e.name||'').trim()?nightLimitInfo(state,i,monthKey):{base:e.night_max??null,vacationDays:0,count:0,limit:e.night_max??null,remaining:e.night_max??null,exceeded:false};
+      e.nightCount=nightInfo.count; e.nightLimit=nightInfo.limit; e.vacationDays=nightInfo.vacationDays; e.nightLimitExceeded=nightInfo.exceeded;
       const extra=String(e.name||'').trim()?monthSpecialHours(state,i,monthKey):{nightWork:0,nightReadiness:0,sundayHoliday:0};
       e.nightWork=extra.nightWork; e.nightReadiness=extra.nightReadiness; e.sundayHoliday=extra.sundayHoliday;
     });
@@ -345,7 +383,7 @@ const Engine = (() => {
 
   return {
     defaultState,sanitizeState,parseDate,dateKey,monthDates,activeEmployeeIndexes,getShift,setShift,clearShift,
-    isSchoolVacation,isHoliday,isBridgeDay,hoursFor,monthActualHours,monthDistributionHours,monthSpecialHours,
+    isSchoolVacation,isHoliday,isBridgeDay,hoursFor,monthActualHours,monthDistributionHours,monthVacationDays,monthNightCount,adjustedNightLimit,nightLimitInfo,canAddNightWithinLimit,canSetNightWithinLimit,monthSpecialHours,
     nightShiftBreakdown,normalizeClock,canPlaceNight,canPlaceAccompaniment,wouldExceedTwoNightsInSixDays,
     freePairViolations,autoSchedule,fillTeam,clearAutomatic,clearExceptLeaveFree,clearAll,clientPayload
   };
